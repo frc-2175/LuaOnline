@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Lua</title>
+
+
+
+    <link rel="stylesheet" href="tachyons.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        .flex-fair {
+            flex-basis: 1px;
+            flex-grow: 1;
+            flex-shrink: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="flex absolute absolute--fill pa3">
+        <div class="flex-fair flex flex-column overflow-hidden">
+            <div id="program" class="flex-grow-1"></div>
+            <button id="run" class="mt3 pa3">Run</button>
+        </div>
+        <div class="flex-fair pa3">
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script src="fengari-web.js"></script>
+    <script src="monaco/min/vs/loader.js"></script>
+    <script>
+        const luaconf  = fengari.luaconf;
+        const lua      = fengari.lua;
+        const lauxlib  = fengari.lauxlib;
+        const lualib   = fengari.lualib;
+
+        let editor;
+        require.config({ paths: { vs: 'monaco/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            const startValue = window.localStorage.getItem('latest') || 'print("Hello world!")';
+
+            editor = monaco.editor.create(document.querySelector('#program'), {
+                value: startValue,
+                language: 'lua',
+                automaticLayout: true,
+                theme: 'vs-dark',
+                minimap: {
+                    enabled: false,
+                },
+            });
+
+            editor.onDidChangeModelContent(() => {
+                window.localStorage.setItem('latest', editor.getValue());
+            });
+
+            const runButton = document.querySelector('#run');
+            const output = document.querySelector('#output');
+
+            const originalLog = console.log;
+            console.log = (...args) => {
+                output.innerText += args[0] + '\n';
+                originalLog(...args);
+            }
+
+            runButton.addEventListener('click', () => {
+                output.innerText = '';
+                try {
+                    const L = lauxlib.luaL_newstate();
+                    // lualib.luaL_openlibs(L);
+                    // lua.lua_sethook(L, null, lua.LUA_MASKCOUNT, 1);
+                    lauxlib.luaL_dostring(editor.getValue());
+                } catch (e) {
+                    console.log(e);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
