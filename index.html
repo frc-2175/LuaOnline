@@ -5,12 +5,29 @@
     <meta charset="utf-8">
     <title>Lua</title>
 
-
-
     <link rel="stylesheet" href="tachyons.css">
     <style>
         * {
             box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol;
+        }
+
+        button {
+            background-color: #484848;
+            border: 1px solid #666;
+            border-radius: 0.2rem;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #505050;
+        }
+
+        button:active {
+            background-color: #4a4a4a;
         }
 
         .flex-fair {
@@ -19,17 +36,36 @@
             flex-shrink: 1;
         }
     </style>
+
+    <script>
+        const startValue = window.localStorage.getItem('latest') || 'print("Hello world!")\n';
+        const editorConfig = {
+            value: startValue,
+            language: 'lua',
+            theme: 'vs-dark',
+
+            fontSize: 18,
+            automaticLayout: true,
+            minimap: {
+                enabled: false,
+            },
+        };
+    </script>
 </head>
 
-<body>
+<body class="white bg-dark-gray">
     <div class="flex absolute absolute--fill pa3">
         <div class="flex-fair flex flex-column overflow-hidden">
-            <div id="program" class="flex-grow-1"></div>
+            <h2 class="mt0 mb3">Program</h2>
+            <div id="program" class="flex-grow-1 overflow-hidden br3"></div>
             <button id="run" class="mt3 pa3">Run</button>
-            <button id="stop" class="mt3 pa3">Stop</button>
+            <button id="stop" class="mt3 pa3 dn">Stop</button>
         </div>
-        <div class="flex-fair pa3">
-            <pre id="output"></pre>
+        <div class="flex-fair ml3 flex flex-column">
+            <h2 class="mt0 mb3">Output</h2>
+            <div class="overflow-y-auto bg-white-10 pa3 br3 flex-grow-1">
+                <pre id="output" class="ma0"></pre>
+            </div>
         </div>
     </div>
 
@@ -55,18 +91,7 @@
         let editor;
         require.config({ paths: { vs: 'monaco/min/vs' } });
         require(['vs/editor/editor.main'], function () {
-            const startValue = window.localStorage.getItem('latest') || 'print("Hello world!")';
-
-            editor = monaco.editor.create(document.querySelector('#program'), {
-                value: startValue,
-                language: 'lua',
-                automaticLayout: true,
-                theme: 'vs-dark',
-                minimap: {
-                    enabled: false,
-                },
-            });
-
+            editor = monaco.editor.create(document.querySelector('#program'), editorConfig);
             editor.onDidChangeModelContent(() => {
                 window.localStorage.setItem('latest', editor.getValue());
             });
@@ -75,11 +100,17 @@
             const stopButton = document.querySelector('#stop');
             const output = document.querySelector('#output');
 
-            let stop;
+            function updateUI(running) {
+                runButton.classList.toggle('dn', running);
+                stopButton.classList.toggle('dn', !running);
+            }
 
+            let stop;
             runButton.addEventListener('click', () => {
                 output.innerText = '';
                 stop = false;
+
+                updateUI(true);
 
                 function startOrResumeProgram(L) {
                     const resumeResult = lua.lua_resume(L, null, 0);
@@ -92,8 +123,9 @@
 
                 function hook(L, debug) {
                     if (stop) {
-                        lua.lua_pushliteral(L, 'program was stopped');
-                        lua.lua_error(L);
+                        lua.lua_yield(L, 0);
+                        write('program was stopped');
+                        updateUI(false);
                         return;
                     }
 
@@ -117,6 +149,7 @@
                     startOrResumeProgram(L);
                 } catch (e) {
                     console.error(e);
+                    updateUI(false);
                 }
             });
             stopButton.addEventListener('click', () => {
