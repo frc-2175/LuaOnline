@@ -35,6 +35,26 @@
             flex-grow: 1;
             flex-shrink: 1;
         }
+
+        .output-error {
+            color: #ff3737;
+            font-weight: bold;
+        }
+
+        .output-suggestion {
+            color: #b7b7ff;
+        }
+
+        .output-hint {
+            color: #9f9f9f;
+            font-style: italic;
+        }
+
+        .line-error {
+            background: #ff3737;
+            width: 4px !important;
+            margin-left: 4px;
+        }
     </style>
 
     <script>
@@ -49,6 +69,9 @@
             minimap: {
                 enabled: false,
             },
+            tabSize: 4,
+            insertSpaces: true,
+            detectIndentation: false,
         };
     </script>
 </head>
@@ -63,8 +86,8 @@
         </div>
         <div class="flex-fair ml3 flex flex-column">
             <h2 class="mt0 mb3">Output</h2>
-            <div class="overflow-y-auto bg-white-10 pa3 br3 flex-grow-1">
-                <pre id="output" class="ma0"></pre>
+            <div class="overflow-auto bg-white-10 pa3 br3 flex-grow-1">
+                <pre id="output" class="ma0" style="width: 0"></pre>
             </div>
         </div>
     </div>
@@ -78,13 +101,21 @@
         const lualib   = fengari.lualib;
 
         const log = console.log;
-        function write(str) {
-            output.innerText += str + '\n';
+        function write(str, klass) {
+            const safeStr = str.replace(/[&<>]/g, tag => {
+                switch (tag) {
+                    case '&': return '&amp;';
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    default: return tag;
+                }
+            });
+            output.innerHTML += `<span class="${klass}">${safeStr}</span>`;
         }
 
         // Fengari just calls console.log, so this is what we have to do...
         console.log = (...args) => {
-            write(args[0]);
+            write(args[0] + '\n');
             log(...args);
         }
 
@@ -92,8 +123,13 @@
         require.config({ paths: { vs: 'monaco/min/vs' } });
         require(['vs/editor/editor.main'], function () {
             editor = monaco.editor.create(document.querySelector('#program'), editorConfig);
+            let oldDecorations = [];
+            function setDecorations(decorations) {
+                oldDecorations = editor.deltaDecorations(oldDecorations, decorations);
+            }
             editor.onDidChangeModelContent(() => {
                 window.localStorage.setItem('latest', editor.getValue());
+                setDecorations([]);
             });
 
             const runButton = document.querySelector('#run');
@@ -105,10 +141,31 @@
                 stopButton.classList.toggle('dn', !running);
             }
 
+            function handleError(errmsg) {
+                write(errmsg + '\n', 'output-error');
+
+                const lineNoMatch = errmsg.match(/\[.*\]:(\d+):/);
+                if (lineNoMatch) {
+                    const lineNo = parseInt(lineNoMatch[1], 10);
+                    setDecorations([
+                        { range: new monaco.Range(lineNo,1, lineNo,1), options: { isWholeLine: true, linesDecorationsClassName: 'line-error' }},
+                    ]);
+                }
+
+                if (errmsg.includes("'then' expected")) {
+                    write('An if statement should look like "if ... then ... end".\nDid you forget the word "then", or accidentally use "do"?', 'output-suggestion');
+                } else if (errmsg.includes("'do' expected near 'then'")) {
+                    write('Loops use "do" instead of "then".', 'output-suggestion');
+                } else if (errmsg.includes("'do' expected")) {
+                    write('Did you forget the word "do" at the start of your loop?', 'output-suggestion');
+                }
+            }
+
             let stop;
-            runButton.addEventListener('click', () => {
+            function runProgram() {
                 output.innerText = '';
                 stop = false;
+                setDecorations([]);
 
                 updateUI(true);
 
@@ -116,15 +173,21 @@
                     const resumeResult = lua.lua_resume(L, null, 0);
                     if (resumeResult && resumeResult !== lua.LUA_YIELD) {
                         const errmsg = lua.lua_tojsstring(L, -1);
-                        write(errmsg);
-                        throw new Error(`Failed to run Lua program (err code ${resumeResult}): ${errmsg}`);
+                        handleError(errmsg);
+                        updateUI(false);
+                        return;
+                    }
+
+                    if (resumeResult === lua.LUA_OK) {
+                        write('program finished successfully', 'output-hint');
+                        updateUI(false);
                     }
                 }
 
                 function hook(L, debug) {
                     if (stop) {
                         lua.lua_yield(L, 0);
-                        write('program was stopped');
+                        write('program was stopped', 'output-hint');
                         updateUI(false);
                         return;
                     }
@@ -142,8 +205,9 @@
                     const loadResult = lauxlib.luaL_loadstring(L, fengari.to_luastring(editor.getValue()));
                     if (loadResult) {
                         const errmsg = lua.lua_tojsstring(L, -1);
-                        write(errmsg);
-                        throw new Error(`Failed to load Lua program (err code ${loadResult}): ${errmsg}`);
+                        handleError(errmsg);
+                        updateUI(false);
+                        return;
                     }
 
                     startOrResumeProgram(L);
@@ -151,9 +215,20 @@
                     console.error(e);
                     updateUI(false);
                 }
+            }
+            function stopProgram() {
+                stop = true;
+            }
+
+            runButton.addEventListener('click', () => {
+                runProgram();
             });
             stopButton.addEventListener('click', () => {
-                stop = true;
+                stopProgram();
+            });
+
+            editor.addCommand(monaco.KeyMod.CtrlCmd|monaco.KeyCode.Enter, function() {
+                runProgram();
             });
         });
 
