@@ -3,10 +3,12 @@
 
 <head>
     <meta charset="utf-8">
-    <title>LuaOnline</title>
+    <title id="PageTitle">Lua</title>
     <link rel="stylesheet" href="tachyons.css">
     <script src="fengari-web.js"></script>
     <script src="monaco/min/vs/loader.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
@@ -56,7 +58,8 @@
             width: 4px !important;
             margin-left: 4px;
         }
-        .theme-slider-div {
+        .toolbar-button-div {
+          display: inline-block;
           position: relative;
         }
         .theme-slider {
@@ -64,13 +67,46 @@
           top: 0px;
           right: 0px;
         }
-
+        .clear-output-button {
+          position: absolute;
+          top: 0px;
+          right: 60px;
+        }
+        .download-button {
+          position: absolute;
+          top: 0px;
+          right: 0px;
+        }
+        .upload-button {
+          position: absolute;
+          top: 0px;
+          right: 30px;
+        }
+        .rename-button {
+          position: absolute;
+          top: 0px;
+          right: 60px;
+        }
+        .delete-button {
+          position: absolute;
+          top: 0px;
+          right: 90px;
+        }
+        a:link {
+          color: inherit;
+        }
+        a:visited {
+          color: inherit;
+        }
+        a:hover {
+          color: gray;
+        }
         input {
           -webkit-appearance: none;
           position: relative;
           width: 50px;
           height: 25px;
-          background-image: url(https://i.postimg.cc/857jHw2q/Screenshot-2020-04-16-at-1-07-06-PM.png);
+          background-image: url(light.png);
           background-size: cover;
           border-radius: 12.5px;
           outline: none;
@@ -92,7 +128,7 @@
         }
 
         input:checked {
-          background-image: url(https://i.postimg.cc/Hn0nstVK/Screenshot-2020-04-16-at-1-07-19-PM.png);
+          background-image: url(dark.png);
           transition: background-image .90s;
 
         }
@@ -185,13 +221,39 @@
     <div class="flex absolute absolute--fill pa3">
         <div class="flex-fair flex flex-column overflow-hidden">
             <h2 class="mt0 mb3">Program</h2>
-            <div id="program" class="flex-grow-1 overflow-hidden br3"></div>
-            <button id="run" class="mt3 pa3">Run</button>
-            <button id="stop" class="mt3 pa3 dn">Stop</button>
+            <div id="program" class="flex-grow-1 overflow-hidden br3">
+            </div>
+            <button id="run" title="Run the program"class="mt3 pa3 material-icons">play_arrow</button>
+            <button id="stop" title="Stop the program" class="mt3 pa3 dn"><span class="material-icons">stop</span></button>
+        </div>
+        <div class="toolbar-button-div">
+          <a id="download-button" onclick="setFileName()" title="Download the program">
+            <span class="material-icons download-button">file_download</span>
+          </a>
+        </div>
+        <div class="toolbar-button-div">
+          <a id="upload-button" onclick="openFile()" href="#" title="Upload a Lua file">
+            <span class="material-icons upload-button">file_upload</span>
+          </a>
+        </div>
+        <div class="toolbar-button-div">
+          <a id="rename-button" onclick="setFileName()" href="#" title="Set the name of your program">
+            <span class="material-icons rename-button">drive_file_rename_outline</span>
+          </a>
+        </div>
+        <div class="toolbar-button-div">
+          <a id="delete-button" onclick="deleteProgram()" href="#" title="Delete your program">
+            <span class="material-icons delete-button">delete</span>
+          </a>
         </div>
         <div class="flex-fair ml3 flex flex-column">
-            <div class="theme-slider-div">
-              <input id="theme-switch" type="checkbox" class="theme-slider" onchange="themeSwitchToggled()"></input>
+            <div class="toolbar-button-div">
+              <a id="clear-output-button" onclick="clearOutput()" href="#" title="Clear the output in the console">
+                <span class="material-icons clear-output-button">clear</span>
+              </a>
+            </div>
+            <div class="toolbar-button-div">
+              <input id="theme-switch" title="Choose a light or dark theme"type="checkbox" class="theme-slider" onchange="themeSwitchToggled()"></input>
             </div>
             <h2 class="mt0 mb3">Output</h2>
             <div class="overflow-auto bg-white-10 pa3 br3 flex-grow-1">
@@ -235,16 +297,21 @@
             }
             editor.onDidChangeModelContent(() => {
                 window.localStorage.setItem('latest', editor.getValue());
+                setDownloadURL()
+                window.onbeforeunload = function() {
+                  return true;
+                };
                 setDecorations([]);
             });
-
             const runButton = document.querySelector('#run');
             const stopButton = document.querySelector('#stop');
             const output = document.querySelector('#output');
 
             function updateUI(running) {
                 runButton.classList.toggle('dn', running);
+                runButton.classList.toggle('material-icons', !running);
                 stopButton.classList.toggle('dn', !running);
+                stopButton.classList.toggle('material-icons', running);
             }
 
             function handleError(errmsg) {
@@ -370,6 +437,81 @@
             }
             originalLog('done dumping', name);
         }
+      var FileNameSetEvent = new Event("FileNameSet")
+      function setFileName() {
+        window.onbeforeunload = null;
+        if (window.fileName == null) {
+          var fileNamePrompt = prompt("What would you like to name your program?")
+          if (fileNamePrompt.endsWith(".lua")) {
+            fileNamePrompt = fileNamePrompt
+          }
+          else if (!fileNamePrompt.endsWith(".lua")) {
+            fileNamePrompt = fileNamePrompt + ".lua"
+          }
+          window.fileName = encodeURI(fileNamePrompt)
+          document.dispatchEvent(FileNameSetEvent)
+          document.getElementById("PageTitle").innerHTML = "Lua | " + window.fileName
+        }
+      }
+      //Create a function to set the download button link to a blob URL containing the file.
+      function setDownloadURL() {
+        if (window.fileName == null) {
+          document.addEventListener("FileNameSet", function(){
+            var programBlob = new Blob([editor.getValue()], {type: 'text/plain'});
+            document.getElementById("download-button").href = window.URL.createObjectURL(programBlob);
+            document.getElementById("download-button").download = window.fileName;
+          })
+        }
+        else {
+          var programBlob = new Blob([editor.getValue()], {type: 'text/plain'});
+          document.getElementById("download-button").href = window.URL.createObjectURL(programBlob);
+          document.getElementById("download-button").download = window.fileName;
+        }
+      }
+      //A function to clear the console
+      function clearOutput() {
+        output.innerText = '';
+      }
+      //A function to clear the console
+      function deleteProgram() {
+        if (confirm("Are you sure you would like to delete your current program?")){
+          editor.setValue('print("Hello world!")\n')
+        }
+      }
+      document.addEventListener("MonacoLoaded", function(){
+        //Run once before changes made and after Monaco is loaded.
+        setDownloadURL()
+      })
+
+      //Create a function to allow the user to open a file
+      //There almost certainly is some modern API to do this, but this is a old workaround.
+
+        function openFile() {
+    	     readFile = function(e) {
+    		       var file = e.target.files[0];
+    		         if (!file) {
+    			            return;
+    		              }
+    		         var reader = new FileReader();
+    		         reader.onload = function(e) {
+    			            var contents = e.target.result;
+                      if (confirm("Pressing \"yes\" will overwrite anything in the editor. Please save before continuing.")) {
+                        editor.setValue(contents);
+                      }
+                      else {
+                        return;
+                      }
+    			            document.body.removeChild(fileInput);
+    		         }
+    		         reader.readAsText(file)
+    	          }
+    	           fileInput = document.createElement("input");
+    	            fileInput.type='file'
+    	            fileInput.style.display='none'
+    	            fileInput.onchange=readFile
+    	            document.body.appendChild(fileInput);
+    	            fileInput.click(fileInput);
+                 }
     </script>
 </body>
 
