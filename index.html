@@ -3,9 +3,10 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Lua</title>
-
+    <title>LuaOnline</title>
     <link rel="stylesheet" href="tachyons.css">
+    <script src="fengari-web.js"></script>
+    <script src="monaco/min/vs/loader.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -55,9 +56,55 @@
             width: 4px !important;
             margin-left: 4px;
         }
+        .theme-slider-div {
+          position: relative;
+        }
+        .theme-slider {
+          position: absolute;
+          top: 0px;
+          right: 0px;
+        }
+
+        input {
+          -webkit-appearance: none;
+          position: relative;
+          width: 50px;
+          height: 25px;
+          background-image: url(https://i.postimg.cc/857jHw2q/Screenshot-2020-04-16-at-1-07-06-PM.png);
+          background-size: cover;
+          border-radius: 12.5px;
+          outline: none;
+          transition: background-image .90s;
+          box-shadow: 0px 2px 5px 1px gray;
+        }
+
+        input:before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          height: 25px;
+          width: 25px;
+          background-color: navy;
+          border-radius: 12.5px;
+          transition: all .9s;
+          background-color: #F7CA33;
+        }
+
+        input:checked {
+          background-image: url(https://i.postimg.cc/Hn0nstVK/Screenshot-2020-04-16-at-1-07-19-PM.png);
+          transition: background-image .90s;
+
+        }
+
+        input:checked:before {
+          transform: translate(100%);
+          transition: all .9s;
+          background-color: #ECF0F3;
+        }
     </style>
 
-    <script>
+    <script type="text/javascript">
         const startValue = window.localStorage.getItem('latest') || 'print("Hello world!")\n';
         const editorConfig = {
             value: startValue,
@@ -73,6 +120,64 @@
             insertSpaces: true,
             detectIndentation: false,
         };
+        document.addEventListener("DOMContentLoaded", function(){
+          window.body = document.getElementsByTagName("body")[0]
+          window.outputDiv = document.getElementsByClassName("br3")[1]
+          window.themeSwitch = document.getElementById("theme-switch")
+          const darkThemeMq = window.matchMedia("(prefers-color-scheme: dark)");
+            darkThemeMq.addListener(e => {
+              if (e.matches) {
+                // Theme set to dark.
+                setTheme("dark")
+            } else {
+              // Theme set to light.
+                setTheme("light")
+            }
+          });
+        })
+
+        function setTheme(theme) {
+          if (theme === "light") {
+            window.body.classList.remove("bg-dark-gray");
+            window.body.classList.remove("white");
+            window.body.classList.add("black");
+            window.body.classList.add("bg-white");
+            window.outputDiv.classList.remove("bg-white-10");
+            window.outputDiv.classList.add("bg-light-gray");
+            monaco.editor.setTheme("vs-light")
+            window.themeSwitch.checked = false
+          }
+
+          if (theme === "dark") {
+            window.body.classList.remove("bg-white");
+            window.body.classList.remove("black");
+            window.body.classList.add("white");
+            window.body.classList.add("bg-dark-gray");
+            window.outputDiv.classList.remove("bg-light-gray");
+            window.outputDiv.classList.add("bg-white-10");
+            monaco.editor.setTheme("vs-dark")
+            window.themeSwitch.checked = true
+          }
+        }
+        function themeSwitchToggled() {
+          if (window.themeSwitch.checked) {
+            setTheme("dark");
+          }
+          else {
+            setTheme("light");
+          }
+        }
+
+        function getCurrentTheme() {
+          if (window.body.classList[1] == "bg-dark-gray") {
+            return "dark"
+          }
+
+          else if (window.body.classList[1] == "bg-white") {
+            return "light"
+          }
+        }
+
     </script>
 </head>
 
@@ -85,6 +190,9 @@
             <button id="stop" class="mt3 pa3 dn">Stop</button>
         </div>
         <div class="flex-fair ml3 flex flex-column">
+            <div class="theme-slider-div">
+              <input id="theme-switch" type="checkbox" class="theme-slider" onchange="themeSwitchToggled()"></input>
+            </div>
             <h2 class="mt0 mb3">Output</h2>
             <div class="overflow-auto bg-white-10 pa3 br3 flex-grow-1">
                 <pre id="output" class="ma0" style="width: 0"></pre>
@@ -92,14 +200,12 @@
         </div>
     </div>
 
-    <script src="fengari-web.js"></script>
-    <script src="monaco/min/vs/loader.js"></script>
     <script>
         const luaconf  = fengari.luaconf;
         const lua      = fengari.lua;
         const lauxlib  = fengari.lauxlib;
         const lualib   = fengari.lualib;
-
+        const MonacoLoadedEvent = new Event('MonacoLoaded');
         const log = console.log;
         function write(str, klass) {
             const safeStr = str.replace(/[&<>]/g, tag => {
@@ -219,7 +325,10 @@
             function stopProgram() {
                 stop = true;
             }
-
+            //If the page is in dark mode, make sure the switch is synced.
+            if (getCurrentTheme() == "dark") {
+              window.themeSwitch.checked = true
+            }
             runButton.addEventListener('click', () => {
                 runProgram();
             });
@@ -230,6 +339,8 @@
             editor.addCommand(monaco.KeyMod.CtrlCmd|monaco.KeyCode.Enter, function() {
                 runProgram();
             });
+            //When monaco is done loading, brodcast a event so the theme can be set.
+            document.dispatchEvent(MonacoLoadedEvent);
         });
 
         function dumpstack(L, name) {
