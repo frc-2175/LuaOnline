@@ -7,8 +7,7 @@
     <link rel="stylesheet" href="tachyons.css">
     <script src="fengari-web.js"></script>
     <script src="monaco/min/vs/loader.js"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
-      rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
@@ -23,6 +22,9 @@
             border: 1px solid #666;
             border-radius: 0.2rem;
             color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         button:hover {
@@ -53,19 +55,30 @@
             font-style: italic;
         }
 
+        #output-container input {
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 0;
+            outline: none;
+            color: inherit;
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        #output-container input, .output-input {
+            color: #ffac44;
+        }
+
         .line-error {
             background: #ff3737;
             width: 4px !important;
             margin-left: 4px;
         }
+
         .toolbar-button-div {
           display: inline-block;
           position: relative;
-        }
-        .theme-slider {
-          position: absolute;
-          top: 0px;
-          right: 0px;
         }
         .clear-output-button {
           position: absolute;
@@ -101,9 +114,12 @@
         a:hover {
           color: gray;
         }
-        input {
+
+        .theme-slider {
           -webkit-appearance: none;
-          position: relative;
+          position: absolute;
+          top: 0px;
+          right: 0px;
           width: 50px;
           height: 25px;
           background-image: url(light.png);
@@ -114,7 +130,7 @@
           box-shadow: 0px 2px 5px 1px gray;
         }
 
-        input:before {
+        .theme-slider:before {
           content: "";
           position: absolute;
           top: 0;
@@ -127,13 +143,12 @@
           background-color: #F7CA33;
         }
 
-        input:checked {
+        .theme-slider:checked {
           background-image: url(dark.png);
           transition: background-image .90s;
-
         }
 
-        input:checked:before {
+        .theme-slider:checked:before {
           transform: translate(100%);
           transition: all .9s;
           background-color: #ECF0F3;
@@ -141,7 +156,24 @@
     </style>
 
     <script type="text/javascript">
-        const startValue = window.localStorage.getItem('latest') || 'print("Hello world!")\n';
+        const defaultProgram = 'print("Hello world!")\n';
+
+        const preamble = `
+            local js = require "js"
+            local window = js.global
+
+            function readString()
+                window:readString()
+                return coroutine.yield()
+            end
+
+            function readNumber()
+                window:readNumber()
+                return coroutine.yield()
+            end
+        `;
+
+        const startValue = window.localStorage.getItem('latest') || defaultProgram;
         const editorConfig = {
             value: startValue,
             language: 'lua',
@@ -157,63 +189,59 @@
             detectIndentation: false,
         };
         document.addEventListener("DOMContentLoaded", function(){
-          window.body = document.getElementsByTagName("body")[0]
-          window.outputDiv = document.getElementsByClassName("br3")[1]
-          window.themeSwitch = document.getElementById("theme-switch")
-          const darkThemeMq = window.matchMedia("(prefers-color-scheme: dark)");
+            window.body = document.getElementsByTagName("body")[0]
+            window.outputDiv = document.getElementsByClassName("br3")[1]
+            window.themeSwitch = document.getElementById("theme-switch")
+            const darkThemeMq = window.matchMedia("(prefers-color-scheme: dark)");
             darkThemeMq.addListener(e => {
-              if (e.matches) {
-                // Theme set to dark.
-                setTheme("dark")
-            } else {
-              // Theme set to light.
-                setTheme("light")
-            }
-          });
-        })
+                if (e.matches) {
+                    // Theme set to dark.
+                    setTheme("dark")
+                } else {
+                    // Theme set to light.
+                    setTheme("light")
+                }
+            });
+        });
 
         function setTheme(theme) {
-          if (theme === "light") {
-            window.body.classList.remove("bg-dark-gray");
-            window.body.classList.remove("white");
-            window.body.classList.add("black");
-            window.body.classList.add("bg-white");
-            window.outputDiv.classList.remove("bg-white-10");
-            window.outputDiv.classList.add("bg-light-gray");
-            monaco.editor.setTheme("vs-light")
-            window.themeSwitch.checked = false
-          }
+            if (theme === "light") {
+                window.body.classList.remove("bg-dark-gray");
+                window.body.classList.remove("white");
+                window.body.classList.add("black");
+                window.body.classList.add("bg-white");
+                window.outputDiv.classList.remove("bg-white-10");
+                window.outputDiv.classList.add("bg-light-gray");
+                monaco.editor.setTheme("vs-light")
+                window.themeSwitch.checked = false
+            }
 
-          if (theme === "dark") {
-            window.body.classList.remove("bg-white");
-            window.body.classList.remove("black");
-            window.body.classList.add("white");
-            window.body.classList.add("bg-dark-gray");
-            window.outputDiv.classList.remove("bg-light-gray");
-            window.outputDiv.classList.add("bg-white-10");
-            monaco.editor.setTheme("vs-dark")
-            window.themeSwitch.checked = true
-          }
+            if (theme === "dark") {
+                window.body.classList.remove("bg-white");
+                window.body.classList.remove("black");
+                window.body.classList.add("white");
+                window.body.classList.add("bg-dark-gray");
+                window.outputDiv.classList.remove("bg-light-gray");
+                window.outputDiv.classList.add("bg-white-10");
+                monaco.editor.setTheme("vs-dark")
+                window.themeSwitch.checked = true
+            }
         }
         function themeSwitchToggled() {
-          if (window.themeSwitch.checked) {
-            setTheme("dark");
-          }
-          else {
-            setTheme("light");
-          }
+            if (window.themeSwitch.checked) {
+                setTheme("dark");
+            } else {
+                setTheme("light");
+            }
         }
 
         function getCurrentTheme() {
-          if (window.body.classList[1] == "bg-dark-gray") {
-            return "dark"
-          }
-
-          else if (window.body.classList[1] == "bg-white") {
-            return "light"
-          }
+            if (window.body.classList[1] == "bg-dark-gray") {
+                return "dark"
+            } else if (window.body.classList[1] == "bg-white") {
+                return "light"
+            }
         }
-
     </script>
 </head>
 
@@ -223,8 +251,8 @@
             <h2 class="mt0 mb3">Program</h2>
             <div id="program" class="flex-grow-1 overflow-hidden br3">
             </div>
-            <button id="run" title="Run the program"class="mt3 pa3 material-icons">play_arrow</button>
-            <button id="stop" title="Stop the program" class="mt3 pa3 dn"><span class="material-icons">stop</span></button>
+            <button id="run" title="Run the program"class="mt3 pa3">Run <span class="material-icons">play_arrow</span></button>
+            <button id="stop" title="Stop the program" class="mt3 pa3 dn">Stop <span class="material-icons">stop</span></button>
         </div>
         <div class="toolbar-button-div">
           <a id="download-button" onclick="setFileName()" title="Download the program">
@@ -256,7 +284,7 @@
               <input id="theme-switch" title="Choose a light or dark theme"type="checkbox" class="theme-slider" onchange="themeSwitchToggled()"></input>
             </div>
             <h2 class="mt0 mb3">Output</h2>
-            <div class="overflow-auto bg-white-10 pa3 br3 flex-grow-1">
+            <div id="output-container" class="overflow-auto bg-white-10 pa3 br3 flex-grow-1">
                 <pre id="output" class="ma0" style="width: 0"></pre>
             </div>
         </div>
@@ -298,9 +326,6 @@
             editor.onDidChangeModelContent(() => {
                 window.localStorage.setItem('latest', editor.getValue());
                 setDownloadURL()
-                window.onbeforeunload = function() {
-                  return true;
-                };
                 setDecorations([]);
             });
             const runButton = document.querySelector('#run');
@@ -309,9 +334,7 @@
 
             function updateUI(running) {
                 runButton.classList.toggle('dn', running);
-                runButton.classList.toggle('material-icons', !running);
                 stopButton.classList.toggle('dn', !running);
-                stopButton.classList.toggle('material-icons', running);
             }
 
             function handleError(errmsg) {
@@ -334,16 +357,63 @@
                 }
             }
 
+            window.onerror = (message) => {
+                write(`Uncaught JS error: ${message}\n`, 'output-error');
+                updateUI(false);
+                // TODO: Is there an error message on the stack? Can we get it?
+            };
+
             let stop;
             function runProgram() {
                 output.innerText = '';
                 stop = false;
+                doHook = true;
                 setDecorations([]);
 
                 updateUI(true);
+                    
+                const L = lauxlib.luaL_newstate();
+                window.L = L;
 
-                function startOrResumeProgram(L) {
-                    const resumeResult = lua.lua_resume(L, null, 0);
+                function readSomething(placeholder, callback) {
+                    const input = document.createElement('input');
+                    input.placeholder = placeholder;
+                    document.querySelector('#output-container').appendChild(input);
+                    input.focus();
+                    input.addEventListener('keyup', e => {
+                        if (e.key === 'Enter') {
+                            input.remove();
+                            const result = e.target.value;
+                            write(result + '\n', 'output-input');
+                            callback(result);
+                        }
+                    });
+                }
+
+                window.readString = () => {
+                    readSomething('Type something here and press enter.', result => {
+                        fengari.interop.push(L, result);
+                        startOrResumeProgram(L, 1);
+                    });
+                }
+                window.readNumber = () => {
+                    const dothething = () => {
+                        readSomething('Type a number and press enter.', result => {
+                            const num = parseInt(result, 10);
+                            if (isNaN(num)) {
+                                write('Please type a number and press enter.\n', 'output-error');
+                                dothething();
+                            } else {
+                                fengari.interop.push(L, num);
+                                startOrResumeProgram(L, 1);
+                            }
+                        });
+                    };
+                    dothething();
+                }
+
+                function startOrResumeProgram(L, numArgs = 0) {
+                    const resumeResult = lua.lua_resume(L, null, numArgs);
                     if (resumeResult && resumeResult !== lua.LUA_YIELD) {
                         const errmsg = lua.lua_tojsstring(L, -1);
                         handleError(errmsg);
@@ -352,45 +422,48 @@
                     }
 
                     if (resumeResult === lua.LUA_OK) {
-                        write('program finished successfully', 'output-hint');
+                        write('program finished successfully\n', 'output-hint');
                         updateUI(false);
                     }
                 }
 
                 function hook(L, debug) {
-                    if (stop) {
-                        lua.lua_yield(L, 0);
-                        write('program was stopped', 'output-hint');
-                        updateUI(false);
-                        return;
-                    }
-
                     lua.lua_yield(L, 0);
-                    setTimeout(() => startOrResumeProgram(L), 0);
-                }
-
-                try {
-                    const L = lauxlib.luaL_newstate();
-                    lualib.luaL_openlibs(L);
-                    let i = 0;
-                    lua.lua_sethook(L, hook, lua.LUA_MASKCOUNT, 1);
-
-                    const loadResult = lauxlib.luaL_loadstring(L, fengari.to_luastring(editor.getValue()));
-                    if (loadResult) {
-                        const errmsg = lua.lua_tojsstring(L, -1);
-                        handleError(errmsg);
-                        updateUI(false);
-                        return;
+                    if (!stop) {
+                        setTimeout(() => startOrResumeProgram(L), 0);
                     }
-
-                    startOrResumeProgram(L);
-                } catch (e) {
-                    console.error(e);
-                    updateUI(false);
                 }
+
+                lualib.luaL_openlibs(L);
+                lauxlib.luaL_requiref(L, fengari.to_luastring('js'), fengari.interop.luaopen_js, 1)
+
+                const preambleResult = lauxlib.luaL_dostring(L, fengari.to_luastring(preamble));
+                if (preambleResult) {
+                    const errmsg = lua.lua_tojsstring(L, -1);
+                    handleError('Error in preamble:\n' + errmsg);
+                    updateUI(false);
+                    return;
+                }
+
+                lua.lua_sethook(L, hook, lua.LUA_MASKCOUNT, 1);
+
+                const loadResult = lauxlib.luaL_loadstring(L, fengari.to_luastring(editor.getValue()));
+                if (loadResult) {
+                    const errmsg = lua.lua_tojsstring(L, -1);
+                    handleError(errmsg);
+                    updateUI(false);
+                    return;
+                }
+
+                startOrResumeProgram(L);
             }
             function stopProgram() {
                 stop = true;
+                write('program was stopped\n', 'output-hint');
+                for (const input of document.querySelectorAll('#output-container input')) {
+                    input.remove();
+                }
+                updateUI(false);
             }
             //If the page is in dark mode, make sure the switch is synced.
             if (getCurrentTheme() == "dark") {
@@ -411,7 +484,7 @@
         });
 
         function dumpstack(L, name) {
-            originalLog('dumping stack', name);
+            log('dumping stack', name);
             const top = lua.lua_gettop(L);
             for (let i = 1; i <= top; i++) {
                 let val;
@@ -433,85 +506,88 @@
                         break;
                 }
 
-                originalLog(i, fengari.to_jsstring(lauxlib.luaL_typename(L, i)), val);
+                log(i, fengari.to_jsstring(lauxlib.luaL_typename(L, i)), val);
             }
-            originalLog('done dumping', name);
+            log('done dumping', name);
         }
-      var FileNameSetEvent = new Event("FileNameSet")
-      function setFileName() {
-        window.onbeforeunload = null;
-        if (window.fileName == null) {
-          var fileNamePrompt = prompt("What would you like to name your program?")
-          if (fileNamePrompt.endsWith(".lua")) {
-            fileNamePrompt = fileNamePrompt
-          }
-          else if (!fileNamePrompt.endsWith(".lua")) {
-            fileNamePrompt = fileNamePrompt + ".lua"
-          }
-          window.fileName = encodeURI(fileNamePrompt)
-          document.dispatchEvent(FileNameSetEvent)
-          document.getElementById("PageTitle").innerHTML = "Lua | " + window.fileName
-        }
-      }
-      //Create a function to set the download button link to a blob URL containing the file.
-      function setDownloadURL() {
-        if (window.fileName == null) {
-          document.addEventListener("FileNameSet", function(){
-            var programBlob = new Blob([editor.getValue()], {type: 'text/plain'});
-            document.getElementById("download-button").href = window.URL.createObjectURL(programBlob);
-            document.getElementById("download-button").download = window.fileName;
-          })
-        }
-        else {
-          var programBlob = new Blob([editor.getValue()], {type: 'text/plain'});
-          document.getElementById("download-button").href = window.URL.createObjectURL(programBlob);
-          document.getElementById("download-button").download = window.fileName;
-        }
-      }
-      //A function to clear the console
-      function clearOutput() {
-        output.innerText = '';
-      }
-      //A function to clear the console
-      function deleteProgram() {
-        if (confirm("Are you sure you would like to delete your current program?")){
-          editor.setValue('print("Hello world!")\n')
-        }
-      }
-      document.addEventListener("MonacoLoaded", function(){
-        //Run once before changes made and after Monaco is loaded.
-        setDownloadURL()
-      })
 
-      //Create a function to allow the user to open a file
-      //There almost certainly is some modern API to do this, but this is a old workaround.
+        const fileNameSetEvent = new Event("FileNameSet")
+        function setFileName() {
+            if (window.fileName == null) {
+                var fileNamePrompt = prompt("What would you like to name your program?")
+                if (fileNamePrompt.endsWith(".lua")) {
+                    fileNamePrompt = fileNamePrompt
+                } else if (!fileNamePrompt.endsWith(".lua")) {
+                    fileNamePrompt = fileNamePrompt + ".lua"
+                }
+                window.fileName = encodeURI(fileNamePrompt)
+                document.dispatchEvent(fileNameSetEvent)
+                document.getElementById("PageTitle").innerHTML = "Lua | " + window.fileName
+            }
+        }
+
+        //Create a function to set the download button link to a blob URL containing the file.
+        function setDownloadURL() {
+            if (window.fileName == null) {
+                document.addEventListener("FileNameSet", function(){
+                    var programBlob = new Blob([editor.getValue()], {type: 'text/plain'});
+                    document.getElementById("download-button").href = window.URL.createObjectURL(programBlob);
+                    document.getElementById("download-button").download = window.fileName;
+                });
+            } else {
+                var programBlob = new Blob([editor.getValue()], {type: 'text/plain'});
+                document.getElementById("download-button").href = window.URL.createObjectURL(programBlob);
+                document.getElementById("download-button").download = window.fileName;
+            }
+        }
+
+        //A function to clear the console
+        function clearOutput() {
+            output.innerText = '';
+        }
+
+        //A function to delete the current program
+        function deleteProgram() {
+            if (confirm("Are you sure you would like to delete your current program?")) {
+                editor.setValue(defaultProgram);
+            }
+        }
+
+        document.addEventListener("MonacoLoaded", function(){
+            //Run once before changes made and after Monaco is loaded.
+            setDownloadURL()
+        });
+
+        // Create a function to allow the user to open a file
+        // There almost certainly is some modern API to do this, but this is a old workaround.
 
         function openFile() {
-    	     readFile = function(e) {
-    		       var file = e.target.files[0];
-    		         if (!file) {
-    			            return;
-    		              }
-    		         var reader = new FileReader();
-    		         reader.onload = function(e) {
-    			            var contents = e.target.result;
-                      if (confirm("Pressing \"yes\" will overwrite anything in the editor. Please save before continuing.")) {
+            readFile = function(e) {
+                const file = e.target.files[0];
+                if (!file) {
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    var contents = e.target.result;
+                    if (confirm("Pressing \"yes\" will overwrite anything in the editor. Please save before continuing.")) {
                         editor.setValue(contents);
-                      }
-                      else {
+                    } else {
                         return;
-                      }
-    			            document.body.removeChild(fileInput);
-    		         }
-    		         reader.readAsText(file)
-    	          }
-    	           fileInput = document.createElement("input");
-    	            fileInput.type='file'
-    	            fileInput.style.display='none'
-    	            fileInput.onchange=readFile
-    	            document.body.appendChild(fileInput);
-    	            fileInput.click(fileInput);
-                 }
+                    }
+                    document.body.removeChild(fileInput);
+                }
+
+                reader.readAsText(file)
+            }
+        
+            fileInput = document.createElement("input");
+            fileInput.type='file'
+            fileInput.style.display='none'
+            fileInput.onchange=readFile
+            document.body.appendChild(fileInput);
+            fileInput.click(fileInput);
+        }
     </script>
 </body>
 
