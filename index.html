@@ -171,6 +171,11 @@
                 window:readNumber()
                 return coroutine.yield()
             end
+
+            io = {
+                read = readString,
+                write = print,
+            }
         `;
 
         const startValue = window.localStorage.getItem('latest') || defaultProgram;
