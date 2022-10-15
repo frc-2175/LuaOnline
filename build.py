@@ -29,7 +29,7 @@ def addId(filename):
 
 for asset in assets:
     basename = os.path.basename(asset)
-    newFilename = addId(basename, buildId)
+    newFilename = addId(basename)
     shutil.copy(asset, 'dist/{}'.format(newFilename))
 
     rootContents = rootContents.replace(basename, newFilename)
